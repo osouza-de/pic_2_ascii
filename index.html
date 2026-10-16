@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de ASCII Art Pro</title>
+    <!-- Biblioteca para tirar screenshot da arte -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --text: #f8fafc;
+            --accent: #38bdf8;
+            --btn: #2563eb;
+            --btn-hover: #1d4ed8;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            margin: 0;
+            min-height: 100vh;
+        }
+        .toolbar {
+            background: var(--panel);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            border: 1px solid #334155;
+            width: 100%;
+            max-width: 900px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+            min-width: 180px;
+        }
+        .control-group.full {
+            min-width: 100%;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #334155;
+            padding-top: 15px;
+        }
+        
+        .radio-group { display: flex; flex-wrap: wrap; gap: 8px; }
+        .radio-group label {
+            cursor: pointer;
+            padding: 6px 12px;
+            background: #334155;
+            border-radius: 6px;
+            font-size: 13px;
+            transition: 0.2s;
+            user-select: none;
+        }
+        .radio-group input { display: none; }
+        .radio-group input:checked + span { color: var(--accent); font-weight: bold; }
+        
+        input[type="range"] { accent-color: var(--accent); width: 100%; }
+        select, input[type="file"]::file-selector-button {
+            background: #334155;
+            color: white;
+            border: 1px solid #475569;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        input[type="file"]::file-selector-button {
+            background: var(--accent);
+            color: #000;
+            font-weight: bold;
+            border: none;
+            margin-right: 12px;
+        }
+
+        button {
+            background: var(--btn);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        button:hover { background: var(--btn-hover); }
+        button.success { background: #16a34a; }
+
+        #output-container {
+            background: #000;
+            padding: 20px;
+            border-radius: 8px;
+            overflow: auto;
+            max-width: 90vw;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+        }
+        pre {
+            margin: 0;
+            font-size: 10px;
+            line-height: 6px; /* Mantém a proporção 1:1 baseada na largura da fonte */
+            letter-spacing: 0;
+            font-weight: bold;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="toolbar">
+        <!-- Linha 1: Arquivo e Resolução -->
+        <div class="control-group">
+            <label>Imagem</label>
+            <input type="file" id="upload" accept="image/*">
+        </div>
+        <div class="control-group">
+            <label for="size">Resolução: <span id="size-val">100</span>px</label>
+            <input type="range" id="size" min="20" max="250" value="100">
+        </div>
+        <div class="control-group">
+            <label for="colors">Qtd. Cores: <span id="colors-val">Full</span></label>
+            <input type="range" id="colors" min="2" max="64" value="64">
+        </div>
+
+        <!-- Linha 2: Filtros e Paletas -->
+        <div class="control-group">
+            <label>Modo Base</label>
+            <div class="radio-group">
+                <label><input type="radio" name="mode" value="color" checked> <span>🎨 Cor</span></label>
+                <label><input type="radio" name="mode" value="bw"> <span>🌑 P/B</span></label>
+                <label><input type="radio" name="mode" value="negative"> <span>👻 Inverter</span></label>
+            </div>
+        </div>
+        <div class="control-group">
+            <label>Fonte</label>
+            <select id="fontFamily">
+                <option value="'Courier New', Courier, monospace">Courier New</option>
+                <option value="Consolas, Monaco, monospace">Consolas</option>
+                <option value="'Fira Code', monospace">Fira Code</option>
+                <option value="'Lucida Console', monospace">Lucida Console</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Filtro Extra</label>
+            <select id="palette">
+                <option value="none">Nenhum (Original)</option>
+                <option value="matrix">Matrix (Verde)</option>
+                <option value="cyberpunk">Cyberpunk (Neon)</option>
+                <option value="sepia">Vintage (Sepia)</option>
+            </select>
+        </div>
+
+        <!-- Linha 3: Ações de Exportação -->
+        <div class="control-group full">
+            <div>
+                <small style="color: #94a3b8;">Dica: Resoluções menores funcionam melhor para copiar como texto.</small>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button id="btnCopy">📋 Copiar Texto</button>
+                <button id="btnSaveTxt">📄 Salvar TXT</button>
+                <button id="btnSave">📸 Salvar Imagem</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="output-container">
+        <!-- A fonte inicial é setada no style inline via JS -->
+        <pre id="ascii-output" style="font-family: 'Courier New', Courier, monospace;">Sua arte aparecerá aqui...</pre>
+    </div>
+
+    <script>
+        const DENSITY = " .',:;+*?%S#@"; 
+        
+        // Elementos DOM
+        const upload = document.getElementById('upload');
+        const sizeInput = document.getElementById('size');
+        const sizeVal = document.getElementById('size-val');
+        const colorsInput = document.getElementById('colors');
+        const colorsVal = document.getElementById('colors-val');
+        const radios = document.getElementsByName('mode');
+        const fontSelect = document.getElementById('fontFamily');
+        const paletteSelect = document.getElementById('palette');
+        const asciiOutput = document.getElementById('ascii-output');
+        const btnCopy = document.getElementById('btnCopy');
+        const btnSaveTxt = document.getElementById('btnSaveTxt');
+        const btnSave = document.getElementById('btnSave');
+
+        let currentImg = null;
+
+        // --- LISTENERS ---
+        upload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    currentImg = img;
+                    generateAscii();
+                }
+                img.src = event.target.result;
+            }
+            reader.readAsDataURL(file);
+        });
+
+        const inputsToListen = [sizeInput, colorsInput, fontSelect, paletteSelect];
+        inputsToListen.forEach(el => el.addEventListener('input', generateAscii));
+        radios.forEach(r => r.addEventListener('change', generateAscii));
+
+        // --- AÇÕES DE EXPORTAÇÃO ---
+        btnCopy.addEventListener('click', () => {
+            // innerText pega os caracteres formatados sem as tags <span> HTML
+            navigator.clipboard.writeText(asciiOutput.innerText).then(() => {
+                const originalText = btnCopy.innerHTML;
+                btnCopy.innerHTML = "✅ Copiado!";
+                btnCopy.classList.add('success');
+                setTimeout(() => {
+                    btnCopy.innerHTML = originalText;
+                    btnCopy.classList.remove('success');
+                }, 2000);
+            });
+        });
+
+        btnSave.addEventListener('click', () => {
+            const container = document.getElementById('output-container');
+            const originalText = btnSave.innerHTML;
+            btnSave.innerHTML = "⏳ Processando...";
+            
+            // Usa html2canvas para renderizar a div em uma imagem PNG
+            html2canvas(container, { backgroundColor: '#000' }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = 'minha_ascii_art.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                
+                btnSave.innerHTML = "✅ Salvo!";
+                btnSave.classList.add('success');
+                setTimeout(() => {
+                    btnSave.innerHTML = originalText;
+                    btnSave.classList.remove('success');
+                }, 2000);
+            });
+        });
+
+        btnSaveTxt.addEventListener('click', () => {
+            // Pega o texto puro sem as tags de cor (<span>)
+            const text = asciiOutput.innerText;
+            
+            // Cria um Blob (Binary Large Object) do tipo texto
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            
+            // Cria um link temporário para forçar o download
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'ascii_art.txt';
+            
+            // Simula o clique e limpa a memória
+            link.click();
+            URL.revokeObjectURL(url);
+            
+            // Feedback visual no botão
+            const originalText = btnSaveTxt.innerHTML;
+            btnSaveTxt.innerHTML = "✅ Arquivo Salvo!";
+            btnSaveTxt.classList.add('success');
+            setTimeout(() => {
+                btnSaveTxt.innerHTML = originalText;
+                btnSaveTxt.classList.remove('success');
+            }, 2000);
+        });
+
+        // --- LÓGICA PRINCIPAL ---
+        function generateAscii() {
+            if (!currentImg) return;
+
+            // Atualiza labels numéricas
+            sizeVal.textContent = sizeInput.value;
+            colorsVal.textContent = colorsInput.value == 64 ? "Full" : colorsInput.value;
+            
+            // Aplica fonte escolhida
+            asciiOutput.style.fontFamily = fontSelect.value;
+
+            const mode = document.querySelector('input[name="mode"]:checked').value;
+            const width = parseInt(sizeInput.value);
+            const numColors = parseInt(colorsInput.value);
+            const palette = paletteSelect.value;
+            
+            const height = Math.floor((currentImg.height / currentImg.width) * width);
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(currentImg, 0, 0, width, height);
+
+            const imgData = ctx.getImageData(0, 0, width, height);
+            const pixels = imgData.data;
+
+            let asciiStr = "";
+
+            for (let y = 0; y < height; y++) {
+                let row = "";
+                for (let x = 0; x < width; x++) {
+                    const index = (y * width + x) * 4;
+                    let r = pixels[index];
+                    let g = pixels[index + 1];
+                    let b = pixels[index + 2];
+
+                    // 1. Processa Quantização de Cores (reduz a paleta)
+                    if (numColors < 64) {
+                        const factor = 255 / (numColors - 1);
+                        r = Math.round(r / factor) * factor;
+                        g = Math.round(g / factor) * factor;
+                        b = Math.round(b / factor) * factor;
+                    }
+
+                    // 2. Processa o Modo Base
+                    if (mode === 'negative') {
+                        r = 255 - r; g = 255 - g; b = 255 - b;
+                    }
+                    
+                    const brightness = (0.299 * r + 0.587 * g + 0.114 * b);
+
+                    if (mode === 'bw') {
+                        r = brightness; g = brightness; b = brightness;
+                    }
+
+                    // 3. Aplica Filtro (Paleta de Cores)
+                    if (palette === 'matrix') {
+                        r = 0; g = brightness; b = 0;
+                    } else if (palette === 'sepia') {
+                        let tr = (r * 0.393) + (g * 0.769) + (b * 0.189);
+                        let tg = (r * 0.349) + (g * 0.686) + (b * 0.168);
+                        let tb = (r * 0.272) + (g * 0.534) + (b * 0.131);
+                        r = Math.min(255, tr); g = Math.min(255, tg); b = Math.min(255, tb);
+                    } else if (palette === 'cyberpunk') {
+                        // Mapeia brilho para tons de rosa neon, roxo e azul cyano
+                        r = brightness > 100 ? 255 : brightness * 1.5;
+                        g = brightness < 128 ? brightness * 1.2 : 0;
+                        b = 255;
+                        r = Math.min(255, r); g = Math.min(255, g);
+                    }
+
+                    // Define o caractere baseado na luminosidade real
+                    const charIndex = Math.floor((brightness / 255) * (DENSITY.length - 1));
+                    const char = DENSITY[Math.min(charIndex, DENSITY.length - 1)];
+
+                    // Se não for modo puro texto preto e branco, colore o span
+                    if (mode === 'bw' && palette === 'none') {
+                        row += char; // Otimização: sem span se for cinza no padrão
+                    } else {
+                        // Arredonda para inteiros para o CSS RGB
+                        r = Math.round(r); g = Math.round(g); b = Math.round(b);
+                        row += `<span style="color: rgb(${r},${g},${b})">${char}</span>`;
+                    }
+                }
+                asciiStr += row + "\n";
+            }
+            
+            asciiOutput.innerHTML = asciiStr;
+        }
+    </script>
+</body>
+</html>

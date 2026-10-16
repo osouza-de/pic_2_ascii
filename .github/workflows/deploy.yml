@@ -1,0 +1,42 @@
+name: Deploy to GitHub Pages
+
+on:
+  # Dispara o deploy ao fazer push na main
+  push:
+    branches: ["master"]
+  # Permite rodar o workflow manualmente pela aba Actions
+  workflow_dispatch:
+
+# Permissões necessárias para o GITHUB_TOKEN usar OIDC e publicar no Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Evita que deploys concorrentes sobrescrevam um ao outro
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Faz o upload de tudo que está na raiz (onde deve estar o index.html)
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
